@@ -61,6 +61,7 @@ uniform float roughness : hint_range(0.0, 1.0) = 0.2;
 uniform float specular : hint_range(0.0, 1.0) = 0.2;
 uniform float rim : hint_range(0.0, 1.0) = 0.0;
 uniform float rim_tint : hint_range(0.0, 1.0) = 0.0;
+uniform float proximity_fade_distance;
 
 // Volume settings:
 uniform float 	refraction 		 = 0.075;						// Refraction of the water
@@ -162,6 +163,10 @@ void fragment()
 
 	float 	depth_raw					 = texture(DEPTH_TEXTURE, ref_uv).r * 2.0 - 1.0;
 	float	depth						 = PROJECTION_MATRIX[3][2] / (depth_raw + PROJECTION_MATRIX[2][2]);
+
+	// World position, for proximity fade
+	vec4 world_pos = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth_raw, 1.0);
+	world_pos.xyz /= world_pos.w;
 			
 	float 	depth_blend 				 = exp((depth+VERTEX.z + depth_offset) * -density);
 			depth_blend 				 = clamp((1.0-depth_blend) * fresnel, 0.0, 1.0);	
@@ -193,6 +198,9 @@ void fragment()
 
 	// Set all values:
 	ALBEDO = color;
+	if (proximity_fade_distance > 0.01) { // Hard limit for transparent pipeline
+		ALPHA *= clamp(1.0 - smoothstep(world_pos.z + proximity_fade_distance, world_pos.z, VERTEX.z), 0.0, 1.0);
+	}
 	ROUGHNESS = roughness;
 	SPECULAR = specular;
 	EMISSION = caustic_color.rgb * caustic;
